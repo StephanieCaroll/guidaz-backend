@@ -1,16 +1,17 @@
 package guidaz_api.model.usuario;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.MappedSuperclass;
 import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
-@Entity
-@Table(name = "tb_usuarios")
-@Inheritance(strategy = InheritanceType.JOINED)
+@MappedSuperclass
 @Getter
 @Setter
 @NoArgsConstructor
