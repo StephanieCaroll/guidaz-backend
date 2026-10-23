@@ -44,6 +44,7 @@ Antes de começar, certifique-se de atender aos seguintes requisitos:
 - **Ionic CLI** instalado globalmente (`npm install -g @ionic/cli`).
 - **Java Development Kit (JDK 17 ou superior)** para rodar o back-end.
 - **Maven** (ou utilize o wrapper `./mvnw` incluso).
+- **MySQL** instalado e rodando localmente (porta 3306). [-->Caso você não saiba como baixar clique aqui <--](https://www.youtube.com/watch?v=VJL-sQ6pe-M)
 - Um editor de código (recomendado: **VS Code** para o front-end e **IntelliJ IDEA / Eclipse** para o back-end).
 
 ---
@@ -52,27 +53,56 @@ Antes de começar, certifique-se de atender aos seguintes requisitos:
 
 Como o Front-end e o Back-end funcionam em conjunto, siga os passos abaixo para iniciar ambos os ambientes:
 
-### 1. Configurando e Rodando o Back-end (API Spring Boot)
+### 1. Configurando o Banco de Dados e o Back-end (API Spring Boot)
+
+O back-end utiliza MySQL. Antes de rodar a aplicação, você precisa configurar o banco de dados e as variáveis de ambiente:
+
+**Passo A: Criar o Banco de Dados**  
+No seu MySQL (via Workbench ou terminal), execute o comando para criar o banco vazio:
+```sql
+CREATE DATABASE guidaz_db;
+```
+
+**Passo B: Configurar o arquivo `.env`**  
+Na raiz da pasta do back-end (`guidaz-backend`), crie um arquivo chamado `.env` e adicione a senha do seu usuário root do MySQL:
+```env
+DB_PASSWORD=sua_senha_aqui
+```
+*(Atenção: Certifique-se de que o arquivo `.env` está listado no seu `.gitignore` para não subir para o repositório)*
+
+**Passo C: Configurar o `application.properties`**  
+Verifique se o arquivo `src/main/resources/application.properties` está com as seguintes configurações para ler o `.env` e gerenciar as tabelas automaticamente:
+```properties
+# Conexão com o MySQL Local
+spring.datasource.url=jdbc:mysql://localhost:3306/guidaz_db?createDatabaseIfNotExist=true&serverTimezone=UTC
+spring.datasource.username=root
+spring.datasource.password=${DB_PASSWORD}
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+# Configurações Críticas do Hibernate
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
+```
+
+**Passo D: Rodar o Back-end**  
 Abra um terminal na pasta do repositório do back-end (`guidaz-backend`):
 
 ```bash
-# Entre no diretório do back-end
-cd guidaz-backend
-
 # No Linux/macOS
 ./mvnw spring-boot:run
 
 # No Windows (CMD/PowerShell)
 mvnw.cmd spring-boot:run
 ```
-O servidor da API iniciará em `http://localhost:8080`.
+O servidor da API iniciará em `http://localhost:8080` e criará as tabelas necessárias no MySQL automaticamente.
 
 ### 2. Configurando e Rodando o Front-end (Ionic/Angular)
-Abra um segundo terminal na pasta do repositório do front-end (`Guidaz-stephanie`):
+Abra um segundo terminal na pasta do repositório do front-end (`Guidaz`):
 
 ```bash
 # Entre no diretório do front-end
-cd Guidaz-stephanie
+cd Guidaz
 
 # Instale as dependências
 npm install
@@ -156,6 +186,38 @@ Abaixo estão os membros responsáveis pelo desenvolvimento do MVP e suas respec
 | **Gabriel Pacheco** | **Saldo e Histórico:** Lógica das telas `saldo-aulas` e `historico-avaliacoes`, calculando horas contratadas vs. pendentes e sistema de 1 a 5 estrelas. |
 
 ---
+
+## 🌿 Como criar e enviar sua própria Branch no GitHub
+
+Se você estiver desenvolvendo uma nova funcionalidade ou correção, é fundamental criar uma branch separada para não alterar o código principal (`main`) diretamente. Siga o passo a passo:
+
+1. **Crie uma nova branch e já mude para ela:**
+   ```bash
+   git checkout -b nome-da-sua-branch
+
+
+2. **Adicione os arquivos que você modificou ou criou:**
+    ```bash
+    git add .
+
+3. **Salve (commit) as suas alterações com uma mensagem descritiva:**
+   ```bash
+   git commit -m "feat: descrição do que você fez"
+
+4. **Envie a sua nova branch para o GitHub pela primeira vez:**
+   ```bash
+   git push -u origin nome-da-sua-branch
+
+> (Nota: O parâmetro -u cria a ligação entre a sua máquina e o GitHub. Nas próximas vezes que for enviar atualizações para essa mesma branch, bastará digitar git push).
+
+5. **Volte para a branch principal (main):**
+   Quando terminar o trabalho na sua branch ou precisar verificar o código original, você pode mudar de volta para a branch principal usando o comando:
+   ```bash
+   git checkout main
+6. **Atualize a sua branch local (Recomendado):**
+   Sempre que voltar para a main, é importante baixar qualquer código novo que possa ter sido aprovado e enviado para o GitHub:
+   ```bash
+   git pull origin main
 
 ## 👥 Colaboradores
 Agradecemos às seguintes pessoas que contribuíram para este projeto:
