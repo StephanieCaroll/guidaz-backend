@@ -1,98 +1,62 @@
-
 package guidaz_api.service.agenda;
 
+import guidaz_api.dto.agenda.BloqueioAgendaDTO;
 import guidaz_api.model.agenda.BloqueioAgenda;
 import guidaz_api.model.usuario.Instrutor;
 import guidaz_api.repository.agenda.BloqueioAgendaRepository;
 import guidaz_api.repository.usuario.InstrutorRepository;
-
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 @Service
 public class BloqueioAgendaService {
 
-    private final BloqueioAgendaRepository repository;
+    private final BloqueioAgendaRepository bloqueioRepository;
     private final InstrutorRepository instrutorRepository;
 
-    public BloqueioAgendaService(
-            BloqueioAgendaRepository repository,
-            InstrutorRepository instrutorRepository
-    ) {
-        this.repository = repository;
+    public BloqueioAgendaService(BloqueioAgendaRepository bloqueioRepository, InstrutorRepository instrutorRepository) {
+        this.bloqueioRepository = bloqueioRepository;
         this.instrutorRepository = instrutorRepository;
     }
 
-    // Consultar os bloqueios de um instrutor em uma data
-    public List<BloqueioAgenda> buscarPorInstrutorEData(
-            Long instrutorId,
-            LocalDate data
-    ) {
-        return repository.findByInstrutorIdAndData(
-                instrutorId,
-                data
-        );
+    @Transactional(readOnly = true)
+    public List<BloqueioAgendaDTO> buscarPorInstrutor(Long instrutorId) {
+        return bloqueioRepository.findByInstrutorId(instrutorId).stream()
+                .map(this::toDTO)
+                .toList();
     }
 
-    // Cadastrar um bloqueio na agenda
-    public BloqueioAgenda criarBloqueio(
-            Long instrutorId,
-            LocalDate data,
-            LocalTime horaInicio,
-            LocalTime horaFim,
-            boolean diaInteiro,
-            String motivo
-    ) {
-        if (instrutorId == null || data == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "O instrutor e a data são obrigatórios."
-            );
-        }
-
-        // Verificar se o instrutor existe
+    @Transactional
+    public BloqueioAgendaDTO criarBloqueio(Long instrutorId, BloqueioAgendaDTO dto) {
         Instrutor instrutor = instrutorRepository.findById(instrutorId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Instrutor não encontrado."
-                ));
+                .orElseThrow(() -> new IllegalArgumentException("Instrutor não encontrado com ID: " + instrutorId));
 
-        // Validar os horários de um bloqueio parcial
-        if (!diaInteiro) {
-            if (horaInicio == null || horaFim == null) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Informe o horário inicial e o horário final."
-                );
-            }
+        BloqueioAgenda entity = new BloqueioAgenda();
+        entity.setInstrutor(instrutor);
+        entity.setData(dto.getData());
+        entity.setHoraInicio(dto.getHoraInicio());
+        entity.setHoraFim(dto.getHoraFim());
+        entity.setMotivo(dto.getMotivo());
 
-            if (!horaFim.isAfter(horaInicio)) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "O horário final deve ser posterior ao horário inicial."
-                );
-            }
-        }
+        BloqueioAgenda salvo = bloqueioRepository.save(entity);
+        return toDTO(salvo);
+    }
 
-        BloqueioAgenda bloqueio = new BloqueioAgenda();
-        bloqueio.setInstrutor(instrutor);
-        bloqueio.setData(data);
-        bloqueio.setDiaInteiro(diaInteiro);
-        bloqueio.setMotivo(motivo);
+    @Transactional
+    public void removerBloqueio(Long bloqueioId) {
+        bloqueioRepository.deleteById(bloqueioId);
+    }
 
-        if (diaInteiro) {
-            bloqueio.setHoraInicio(null);
-            bloqueio.setHoraFim(null);
-        } else {
-            bloqueio.setHoraInicio(horaInicio);
-            bloqueio.setHoraFim(horaFim);
-        }
-
-        return repository.save(bloqueio);
+    private BloqueioAgendaDTO toDTO(BloqueioAgenda entity) {
+        return new BloqueioAgendaDTO(
+                entity.getId(),
+                entity.getInstrutor() != null ? entity.getInstrutor().getId() : null,
+                entity.getData(),
+                entity.getHoraInicio(),
+                entity.getHoraFim(),
+                entity.getMotivo()
+        );
     }
 }

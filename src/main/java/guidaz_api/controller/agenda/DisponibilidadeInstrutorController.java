@@ -1,16 +1,13 @@
-
 package guidaz_api.controller.agenda;
 
-import guidaz_api.model.agenda.DisponibilidadeInstrutor;
+import guidaz_api.dto.agenda.DisponibilidadeInstrutorDTO;
+import guidaz_api.dto.agenda.SlotDisponivelDTO;
 import guidaz_api.service.agenda.DisponibilidadeInstrutorService;
-
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 @RestController
@@ -18,64 +15,31 @@ import java.util.List;
 @CrossOrigin(origins = "*")
 public class DisponibilidadeInstrutorController {
 
-    private final DisponibilidadeInstrutorService service;
+    private final DisponibilidadeInstrutorService disponibilidadeService;
 
-    public DisponibilidadeInstrutorController(
-            DisponibilidadeInstrutorService service
-    ) {
-        this.service = service;
+    public DisponibilidadeInstrutorController(DisponibilidadeInstrutorService disponibilidadeService) {
+        this.disponibilidadeService = disponibilidadeService;
     }
 
-    // Consultar todos os períodos ativos de um instrutor.
     @GetMapping("/instrutor/{instrutorId}")
-    public List<DisponibilidadeInstrutor> buscarPorInstrutor(
-            @PathVariable Long instrutorId
-    ) {
-        return service.buscarPorInstrutor(instrutorId);
+    public ResponseEntity<List<DisponibilidadeInstrutorDTO>> obterDisponibilidades(@PathVariable Long instrutorId) {
+        List<DisponibilidadeInstrutorDTO> disponibilidades = disponibilidadeService.buscarPorInstrutor(instrutorId);
+        return ResponseEntity.ok(disponibilidades);
     }
 
-    // Consultar os períodos ativos de um instrutor em um dia da semana.
-    @GetMapping("/instrutor/{instrutorId}/dia")
-    public List<DisponibilidadeInstrutor> buscarPorInstrutorEDia(
+    @PostMapping("/instrutor/{instrutorId}")
+    public ResponseEntity<List<DisponibilidadeInstrutorDTO>> salvarDisponibilidades(
             @PathVariable Long instrutorId,
-            @RequestParam DayOfWeek diaSemana
-    ) {
-        return service.buscarPorInstrutorEDia(
-                instrutorId,
-                diaSemana
-        );
+            @RequestBody List<DisponibilidadeInstrutorDTO> dtos) {
+        List<DisponibilidadeInstrutorDTO> salvas = disponibilidadeService.salvarDisponibilidades(instrutorId, dtos);
+        return ResponseEntity.ok(salvas);
     }
 
-    // Cadastrar um período de disponibilidade.
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public DisponibilidadeInstrutor criarDisponibilidade(
-            @RequestParam Long instrutorId,
-            @RequestParam DayOfWeek diaSemana,
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.TIME)
-            LocalTime horaInicio,
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.TIME)
-            LocalTime horaFim
-    ) {
-        return service.criarDisponibilidade(
-                instrutorId,
-                diaSemana,
-                horaInicio,
-                horaFim
-        );
-    }
-
-    // Consultar os horários livres para aulas de 50 minutos em uma data.
-    @GetMapping("/instrutor/{instrutorId}/horarios-livres")
-    public List<LocalTime> buscarHorariosLivres(
+    @GetMapping("/instrutor/{instrutorId}/slots")
+    public ResponseEntity<List<SlotDisponivelDTO>> obterSlotsDoDia(
             @PathVariable Long instrutorId,
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate data
-    ) {
-        return service.buscarHorariosLivres(instrutorId, data);
+            @RequestParam("data") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
+        List<SlotDisponivelDTO> slots = disponibilidadeService.gerarSlotsDoDia(instrutorId, data);
+        return ResponseEntity.ok(slots);
     }
 }
-
