@@ -1,57 +1,40 @@
-
 package guidaz_api.controller.agenda;
 
-import guidaz_api.dto.agenda.BloqueioAgendaRequest;
-import guidaz_api.model.agenda.BloqueioAgenda;
+import guidaz_api.dto.agenda.BloqueioAgendaDTO;
 import guidaz_api.service.agenda.BloqueioAgendaService;
-
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/bloqueios-agenda")
+@RequestMapping("/api/bloqueios")
 @CrossOrigin(origins = "*")
 public class BloqueioAgendaController {
 
-    private final BloqueioAgendaService service;
+    private final BloqueioAgendaService bloqueioService;
 
-    public BloqueioAgendaController(
-            BloqueioAgendaService service
-    ) {
-        this.service = service;
+    public BloqueioAgendaController(BloqueioAgendaService bloqueioService) {
+        this.bloqueioService = bloqueioService;
     }
 
-    // Consultar os bloqueios de um instrutor em uma data
     @GetMapping("/instrutor/{instrutorId}")
-    public List<BloqueioAgenda> buscarPorInstrutorEData(
-            @PathVariable Long instrutorId,
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate data
-    ) {
-        return service.buscarPorInstrutorEData(
-                instrutorId,
-                data
-        );
+    public ResponseEntity<List<BloqueioAgendaDTO>> obterBloqueios(@PathVariable Long instrutorId) {
+        List<BloqueioAgendaDTO> bloqueios = bloqueioService.buscarPorInstrutor(instrutorId);
+        return ResponseEntity.ok(bloqueios);
     }
 
-    // Cadastrar um bloqueio na agenda
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public BloqueioAgenda criarBloqueio(
-            @RequestBody BloqueioAgendaRequest request
-    ) {
-        return service.criarBloqueio(
-                request.instrutorId(),
-                request.data(),
-                request.horaInicio(),
-                request.horaFim(),
-                request.diaInteiro(),
-                request.motivo()
-        );
+    @PostMapping("/instrutor/{instrutorId}")
+    public ResponseEntity<BloqueioAgendaDTO> criarBloqueio(
+            @PathVariable Long instrutorId,
+            @RequestBody BloqueioAgendaDTO dto) {
+        BloqueioAgendaDTO novoBloqueio = bloqueioService.criarBloqueio(instrutorId, dto);
+        return ResponseEntity.ok(novoBloqueio);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> removerBloqueio(@PathVariable Long id) {
+        bloqueioService.removerBloqueio(id);
+        return ResponseEntity.noContent().build();
     }
 }

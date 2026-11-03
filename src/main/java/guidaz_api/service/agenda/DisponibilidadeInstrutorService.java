@@ -1,16 +1,15 @@
-
 package guidaz_api.service.agenda;
 
+import guidaz_api.dto.agenda.DisponibilidadeInstrutorDTO;
+import guidaz_api.dto.agenda.SlotDisponivelDTO;
 import guidaz_api.model.agenda.BloqueioAgenda;
 import guidaz_api.model.agenda.DisponibilidadeInstrutor;
 import guidaz_api.model.usuario.Instrutor;
 import guidaz_api.repository.agenda.BloqueioAgendaRepository;
 import guidaz_api.repository.agenda.DisponibilidadeInstrutorRepository;
 import guidaz_api.repository.usuario.InstrutorRepository;
-
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -21,167 +20,84 @@ import java.util.List;
 @Service
 public class DisponibilidadeInstrutorService {
 
-    private static final int DURACAO_AULA_MINUTOS = 50;
-
-    private final DisponibilidadeInstrutorRepository repository;
+    private final DisponibilidadeInstrutorRepository disponibilidadeRepository;
+    private final BloqueioAgendaRepository bloqueioRepository;
     private final InstrutorRepository instrutorRepository;
-    private final BloqueioAgendaRepository bloqueioAgendaRepository;
 
     public DisponibilidadeInstrutorService(
-            DisponibilidadeInstrutorRepository repository,
-            InstrutorRepository instrutorRepository,
-            BloqueioAgendaRepository bloqueioAgendaRepository
-    ) {
-        this.repository = repository;
+            DisponibilidadeInstrutorRepository disponibilidadeRepository,
+            BloqueioAgendaRepository bloqueioRepository,
+            InstrutorRepository instrutorRepository) {
+        this.disponibilidadeRepository = disponibilidadeRepository;
+        this.bloqueioRepository = bloqueioRepository;
         this.instrutorRepository = instrutorRepository;
-        this.bloqueioAgendaRepository = bloqueioAgendaRepository;
     }
 
-    // Consultar os horários ativos de um instrutor.
-    public List<DisponibilidadeInstrutor> buscarPorInstrutor(
-            Long instrutorId
-    ) {
-        return repository.findByInstrutorIdAndAtivoTrue(instrutorId);
+    @Transactional(readOnly = true)
+    public List<DisponibilidadeInstrutorDTO> buscarPorInstrutor(Long instrutorId) {
+        return disponibilidadeRepository.findByInstrutorId(instrutorId).stream()
+                .map(this::toDTO)
+                .toList();
     }
 
-    // Consultar os horários ativos de um instrutor em um dia da semana.
-    public List<DisponibilidadeInstrutor> buscarPorInstrutorEDia(
-            Long instrutorId,
-            DayOfWeek diaSemana
-    ) {
-        return repository.findByInstrutorIdAndDiaSemanaAndAtivoTrue(
-                instrutorId,
-                diaSemana
-        );
-    }
-
-    // Cadastrar um período de disponibilidade.
-    public DisponibilidadeInstrutor criarDisponibilidade(
-            Long instrutorId,
-            DayOfWeek diaSemana,
-            LocalTime horaInicio,
-            LocalTime horaFim
-    ) {
-        if (instrutorId == null || diaSemana == null
-                || horaInicio == null || horaFim == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Instrutor, dia da semana e horários são obrigatórios."
-            );
-        }
-
-        if (!horaFim.isAfter(horaInicio)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "O horário final deve ser posterior ao inicial."
-            );
-        }
-
+    @Transactional
+    public List<DisponibilidadeInstrutorDTO> salvarDisponibilidades(Long instrutorId, List<DisponibilidadeInstrutorDTO> dtos) {
         Instrutor instrutor = instrutorRepository.findById(instrutorId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Instrutor não encontrado."
-                ));
+                .orElseThrow(() -> new IllegalArgumentException("Instrutor não encontrado com o ID: " + instrutorId));
 
-        DisponibilidadeInstrutor disponibilidade =
-                new DisponibilidadeInstrutor();
+        disponibilidadeRepository.deleteByInstrutorId(instrutorId);
 
-        disponibilidade.setInstrutor(instrutor);
-        disponibilidade.setDiaSemana(diaSemana);
-        disponibilidade.setHoraInicio(horaInicio);
-        disponibilidade.setHoraFim(horaFim);
-        disponibilidade.setAtivo(true);
+        List<DisponibilidadeInstrutor> disponibilidades = dtos.stream().map(dto -> {
+            DisponibilidadeInstrutor entity = new DisponibilidadeInstrutor();
+            entity.setInstrutor(instrutor);
+            entity.setDiaSemana(dto.getDiaSemana());
+            entity.setHoraInicio(dto.getHoraInicio());
+            entity.setHoraFim(dto.getHoraFim());
+            entity.setAtivo(dto.getAtivo() != null ? dto.getAtivo() : true);
+            return entity;
+        }).toList();
 
-        return repository.save(disponibilidade);
+        List<DisponibilidadeInstrutor> salvas = disponibilidadeRepository.saveAll(disponibilidades);
+        return salvas.stream().map(this::toDTO).toList();
     }
 
-    // Consultar os horários livres de um instrutor em uma data.
-    public List<LocalTime> buscarHorariosLivres(
-            Long instrutorId,
-            LocalDate data
-    ) {
-        if (instrutorId == null || data == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "O instrutor e a data são obrigatórios."
-            );
-        }
-
-        // Confirma se o instrutor existe.
-        instrutorRepository.findById(instrutorId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Instrutor não encontrado."
-                ));
-
-        // Descobre o dia da semana da data informada.
+    @Transactional(readOnly = true)
+    public List<SlotDisponivelDTO> gerarSlotsDoDia(Long instrutorId, LocalDate data) {
         DayOfWeek diaSemana = data.getDayOfWeek();
+        List<DisponibilidadeInstrutor> disponibilidadesDia = disponibilidadeRepository
+                .findByInstrutorIdAndDiaSemanaAndAtivoTrue(instrutorId, diaSemana);
+        List<BloqueioAgenda> bloqueios = bloqueioRepository.findByInstrutorIdAndData(instrutorId, data);
 
-        // Busca os períodos em que o instrutor trabalha nesse dia.
-        List<DisponibilidadeInstrutor> disponibilidades =
-                repository.findByInstrutorIdAndDiaSemanaAndAtivoTrue(
-                        instrutorId,
-                        diaSemana
+        List<SlotDisponivelDTO> slots = new ArrayList<>();
+
+        for (DisponibilidadeInstrutor disp : disponibilidadesDia) {
+            LocalTime atual = disp.getHoraInicio();
+            while (atual.isBefore(disp.getHoraFim())) {
+                final LocalTime horaSlot = atual;
+                boolean bloqueado = bloqueios.stream().anyMatch(b ->
+                        !horaSlot.isBefore(b.getHoraInicio()) && horaSlot.isBefore(b.getHoraFim())
                 );
 
-        // Busca os bloqueios cadastrados para essa data.
-        List<BloqueioAgenda> bloqueios =
-                bloqueioAgendaRepository
-                        .findByInstrutorIdAndData(instrutorId, data);
-
-        List<LocalTime> horariosLivres = new ArrayList<>();
-
-        // Percorre cada período de disponibilidade.
-        for (DisponibilidadeInstrutor disponibilidade : disponibilidades) {
-
-            LocalTime inicio = disponibilidade.getHoraInicio();
-            LocalTime fim = disponibilidade.getHoraFim();
-
-            // Gera aulas de 50 minutos, sem ultrapassar o fim do período.
-            LocalTime horario = inicio;
-
-            while (!horario.plusMinutes(DURACAO_AULA_MINUTOS).isAfter(fim)) {
-
-                LocalTime fimAula =
-                        horario.plusMinutes(DURACAO_AULA_MINUTOS);
-
-                boolean bloqueado = false;
-
-                // Verifica se a aula coincide com algum bloqueio.
-                for (BloqueioAgenda bloqueio : bloqueios) {
-
-                    // Um bloqueio de dia inteiro elimina todos os horários.
-                    if (bloqueio.isDiaInteiro()) {
-                        bloqueado = true;
-                        break;
-                    }
-
-                    LocalTime inicioBloqueio = bloqueio.getHoraInicio();
-                    LocalTime fimBloqueio = bloqueio.getHoraFim();
-
-                    // Verifica se os intervalos se sobrepõem.
-                    boolean existeSobreposicao =
-                            horario.isBefore(fimBloqueio)
-                            && fimAula.isAfter(inicioBloqueio);
-
-                    if (existeSobreposicao) {
-                        bloqueado = true;
-                        break;
-                    }
-                }
-
-                if (!bloqueado) {
-                    horariosLivres.add(horario);
-                }
-
-                // O próximo horário começa após a aula de 50 minutos.
-                horario = fimAula;
+                slots.add(new SlotDisponivelDTO(
+                        horaSlot,
+                        !bloqueado,
+                        bloqueado ? "BLOQUEADO_PESSOAL" : "LIVRE"
+                ));
+                atual = atual.plusHours(1);
             }
         }
 
-        return horariosLivres.stream()
-                .distinct()
-                .sorted()
-                .toList();
+        return slots;
+    }
+
+    private DisponibilidadeInstrutorDTO toDTO(DisponibilidadeInstrutor entity) {
+        return new DisponibilidadeInstrutorDTO(
+                entity.getId(),
+                entity.getInstrutor() != null ? entity.getInstrutor().getId() : null,
+                entity.getDiaSemana(),
+                entity.getHoraInicio(),
+                entity.getHoraFim(),
+                entity.getAtivo()
+        );
     }
 }
