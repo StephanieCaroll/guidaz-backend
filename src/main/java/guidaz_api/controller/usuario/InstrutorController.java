@@ -3,9 +3,13 @@ package guidaz_api.controller.usuario;
 import guidaz_api.model.usuario.Instrutor;
 import guidaz_api.repository.usuario.InstrutorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -70,6 +74,54 @@ public class InstrutorController {
             return ResponseEntity.ok("Conta de instrutor editada com sucesso.");
         }
         return ResponseEntity.notFound().build();
+    }
+
+    @PostMapping("/{id}/foto")
+    public ResponseEntity<?> uploadFoto(@PathVariable Long id, @RequestParam("foto") MultipartFile foto) {
+        Optional<Instrutor> instrutorOpt = instrutorRepository.findById(id);
+        if (instrutorOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (foto == null || foto.isEmpty()) {
+            return ResponseEntity.badRequest().body("Arquivo de foto não fornecido.");
+        }
+
+        try {
+            Instrutor instrutor = instrutorOpt.get();
+            instrutor.setFotoData(foto.getBytes());
+            instrutor.setFotoType(foto.getContentType());
+            instrutor.setFotoUrl("/api/instrutores/" + id + "/foto");
+
+            instrutorRepository.save(instrutor);
+
+            return ResponseEntity.ok(instrutor);
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body("Erro ao salvar foto de perfil: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/foto")
+    public ResponseEntity<byte[]> buscarFoto(@PathVariable Long id) {
+        Optional<Instrutor> instrutorOpt = instrutorRepository.findById(id);
+
+        if (instrutorOpt.isEmpty() || instrutorOpt.get().getFotoData() == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Instrutor instrutor = instrutorOpt.get();
+        MediaType mediaType = MediaType.IMAGE_JPEG;
+
+        if (instrutor.getFotoType() != null && !instrutor.getFotoType().isEmpty()) {
+            try {
+                mediaType = MediaType.parseMediaType(instrutor.getFotoType());
+            } catch (Exception ignored) {}
+        }
+
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .body(instrutor.getFotoData());
     }
 
     @DeleteMapping("/{id}")
