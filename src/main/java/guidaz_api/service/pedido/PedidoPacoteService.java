@@ -4,8 +4,6 @@ import guidaz_api.dto.pedido.*;
 import guidaz_api.exception.DadoInvalidoException;
 import guidaz_api.exception.RegraNegocioException;
 import guidaz_api.exception.RecursoNaoEncontradoException;
-import guidaz_api.model.agenda.BloqueioAgenda;
-import guidaz_api.model.agenda.DisponibilidadeInstrutor;
 import guidaz_api.model.pedido.*;
 import guidaz_api.model.usuario.Aluno;
 import guidaz_api.model.usuario.Instrutor;
@@ -15,6 +13,7 @@ import guidaz_api.repository.pedido.PedidoPacoteHorarioRepository;
 import guidaz_api.repository.pedido.PedidoPacoteRepository;
 import guidaz_api.repository.usuario.AlunoRepository;
 import guidaz_api.repository.usuario.InstrutorRepository;
+import guidaz_api.service.agenda.aula.AulaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,18 +37,21 @@ public class PedidoPacoteService {
     private final InstrutorRepository instrutorRepository;
     private final DisponibilidadeInstrutorRepository disponibilidadeRepository;
     private final BloqueioAgendaRepository bloqueioRepository;
+    private final AulaService aulaService;
 
     public PedidoPacoteService(PedidoPacoteRepository pedidoRepository,
             PedidoPacoteHorarioRepository horarioRepository, AlunoRepository alunoRepository,
             InstrutorRepository instrutorRepository,
             DisponibilidadeInstrutorRepository disponibilidadeRepository,
-            BloqueioAgendaRepository bloqueioRepository) {
+            BloqueioAgendaRepository bloqueioRepository,
+            AulaService aulaService) {
         this.pedidoRepository = pedidoRepository;
         this.horarioRepository = horarioRepository;
         this.alunoRepository = alunoRepository;
         this.instrutorRepository = instrutorRepository;
         this.disponibilidadeRepository = disponibilidadeRepository;
         this.bloqueioRepository = bloqueioRepository;
+        this.aulaService = aulaService;
     }
 
     @Transactional(readOnly = true)
@@ -146,7 +148,7 @@ public class PedidoPacoteService {
                 case "D", "ONIBUS" -> resultado.add("D");
                 case "E", "CARRETA" -> resultado.add("E");
                 case "AB" -> resultado.addAll(Set.of("A", "B"));
-                default -> { /* tokens não reconhecidos são ignorados */ }
+                default -> { }
             }
         }
         return resultado;
@@ -203,7 +205,9 @@ public class PedidoPacoteService {
         exigirStatus(p, StatusPedido.EM_ANALISE);
         p.setStatus(StatusPedido.APROVADO);
         p.setAnalisadoEm(LocalDateTime.now());
-        return PedidoPacoteDTO.de(pedidoRepository.save(p));
+        PedidoPacote salvo = pedidoRepository.save(p);
+        aulaService.gerarAulasDePacoteAprovado(salvo);
+        return PedidoPacoteDTO.de(salvo);
     }
 
     @Transactional

@@ -1,4 +1,6 @@
 package guidaz_api.model.aula;
 
-public class TipoAvaliador {
+public enum TipoAvaliador {
+    ALUNO,
+    INSTRUTOR
 }
