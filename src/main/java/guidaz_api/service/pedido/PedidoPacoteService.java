@@ -9,14 +9,17 @@ import guidaz_api.model.usuario.Aluno;
 import guidaz_api.model.usuario.Instrutor;
 import guidaz_api.repository.agenda.BloqueioAgendaRepository;
 import guidaz_api.repository.agenda.DisponibilidadeInstrutorRepository;
+import guidaz_api.repository.pedido.PacoteCatalogoRepository;
 import guidaz_api.repository.pedido.PedidoPacoteHorarioRepository;
 import guidaz_api.repository.pedido.PedidoPacoteRepository;
 import guidaz_api.repository.usuario.AlunoRepository;
 import guidaz_api.repository.usuario.InstrutorRepository;
 import guidaz_api.service.agenda.aula.AulaService;
+import guidaz_api.service.notificacao.NotificacaoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -33,30 +36,120 @@ public class PedidoPacoteService {
 
     private final PedidoPacoteRepository pedidoRepository;
     private final PedidoPacoteHorarioRepository horarioRepository;
+    private final PacoteCatalogoRepository pacoteRepository;
     private final AlunoRepository alunoRepository;
     private final InstrutorRepository instrutorRepository;
     private final DisponibilidadeInstrutorRepository disponibilidadeRepository;
     private final BloqueioAgendaRepository bloqueioRepository;
     private final AulaService aulaService;
+    private final NotificacaoService notificacaoService;
 
     public PedidoPacoteService(PedidoPacoteRepository pedidoRepository,
-            PedidoPacoteHorarioRepository horarioRepository, AlunoRepository alunoRepository,
+            PedidoPacoteHorarioRepository horarioRepository,
+            PacoteCatalogoRepository pacoteRepository,
+            AlunoRepository alunoRepository,
             InstrutorRepository instrutorRepository,
             DisponibilidadeInstrutorRepository disponibilidadeRepository,
             BloqueioAgendaRepository bloqueioRepository,
-            AulaService aulaService) {
+            AulaService aulaService,
+            NotificacaoService notificacaoService) {
         this.pedidoRepository = pedidoRepository;
         this.horarioRepository = horarioRepository;
+        this.pacoteRepository = pacoteRepository;
         this.alunoRepository = alunoRepository;
         this.instrutorRepository = instrutorRepository;
         this.disponibilidadeRepository = disponibilidadeRepository;
         this.bloqueioRepository = bloqueioRepository;
         this.aulaService = aulaService;
+        this.notificacaoService = notificacaoService;
     }
 
     @Transactional(readOnly = true)
-    public List<PacoteDTO> listarPacotes() {
-        return PacoteCatalogo.todos().stream().map(PacoteDTO::de).toList();
+    public List<PacoteDTO> listarPacotes(Long instrutorId) {
+        List<PacoteCatalogo> globais = pacoteRepository.findByInstrutorIdIsNullAndAtivoTrueOrderByIdAsc();
+        if (instrutorId == null) {
+            return globais.stream().map(PacoteDTO::de).toList();
+        }
+
+        List<PacoteCatalogo> personalizados = pacoteRepository.findByInstrutorIdAndAtivoTrueOrderByIdAsc(instrutorId);
+        Map<String, PacoteCatalogo> porCategoria = new LinkedHashMap<>();
+
+        for (PacoteCatalogo p : globais) {
+            porCategoria.put(p.getCategoria().toUpperCase(Locale.ROOT), p);
+        }
+        for (PacoteCatalogo p : personalizados) {
+            porCategoria.put(p.getCategoria().toUpperCase(Locale.ROOT), p);
+        }
+
+        return porCategoria.values().stream().map(PacoteDTO::de).toList();
+    }
+
+    @Transactional
+    public PacoteDTO salvarPacoteInstrutor(SalvarPacoteRequest request) {
+        validarRequestPacote(request);
+        if (!instrutorRepository.existsById(request.instrutorId())) {
+            throw new RecursoNaoEncontradoException("Instrutor não encontrado.");
+        }
+
+        String categoria = request.categoria().trim().toUpperCase(Locale.ROOT);
+        PacoteCatalogo pacote = pacoteRepository
+                .findByInstrutorIdAndCategoriaAndAtivoTrue(request.instrutorId(), categoria)
+                .orElseGet(() -> new PacoteCatalogo(
+                        request.nome().trim(),
+                        categoria,
+                        request.quantidadeAulas(),
+                        request.preco(),
+                        request.instrutorId()
+                ));
+
+        pacote.setNome(request.nome().trim());
+        pacote.setQuantidadeAulas(request.quantidadeAulas());
+        pacote.setPreco(request.preco());
+        pacote.setInstrutorId(request.instrutorId());
+        pacote.setAtivo(true);
+
+        return PacoteDTO.de(pacoteRepository.save(pacote));
+    }
+
+    @Transactional
+    public PacoteDTO atualizarPacoteInstrutor(Long id, SalvarPacoteRequest request) {
+        validarRequestPacote(request);
+        PacoteCatalogo existente = pacoteRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Pacote não encontrado."));
+
+        if (existente.getInstrutorId() == null) {
+            return salvarPacoteInstrutor(new SalvarPacoteRequest(
+                    request.instrutorId(),
+                    request.nome() != null && !request.nome().isBlank() ? request.nome() : existente.getNome(),
+                    existente.getCategoria(),
+                    request.quantidadeAulas(),
+                    request.preco()
+            ));
+        }
+
+        if (!existente.getInstrutorId().equals(request.instrutorId())) {
+            throw new RegraNegocioException("Você só pode editar seus próprios pacotes.");
+        }
+
+        if (request.nome() != null && !request.nome().isBlank()) {
+            existente.setNome(request.nome().trim());
+        }
+        existente.setQuantidadeAulas(request.quantidadeAulas());
+        existente.setPreco(request.preco());
+
+        return PacoteDTO.de(pacoteRepository.save(existente));
+    }
+
+    private void validarRequestPacote(SalvarPacoteRequest request) {
+        if (request == null || request.instrutorId() == null || request.categoria() == null || request.categoria().isBlank()) {
+            throw new DadoInvalidoException("Informe instrutorId e categoria do pacote.");
+        }
+        if (request.quantidadeAulas() == null || request.quantidadeAulas() < 1 || request.quantidadeAulas() > 50) {
+            throw new DadoInvalidoException("A quantidade de aulas deve ser entre 1 e 50.");
+        }
+        if (request.preco() == null || request.preco().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new DadoInvalidoException("Informe um preço maior que zero.");
+        }
     }
 
     @Transactional
@@ -68,8 +161,9 @@ public class PedidoPacoteService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Aluno não encontrado."));
         Instrutor instrutor = instrutorRepository.findById(request.instrutorId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Instrutor não encontrado."));
-        PacoteCatalogo pacote = Optional.ofNullable(PacoteCatalogo.porId(request.pacoteId()))
+        PacoteCatalogo pacote = pacoteRepository.findById(request.pacoteId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Pacote não encontrado."));
+
         validarCategoriaInstrutor(instrutor, pacote.getCategoria());
         List<HorarioGerado> horarios = new ArrayList<>();
         for (int semana = 0; semana < pacote.getQuantidadeAulas(); semana++) {
@@ -102,6 +196,27 @@ public class PedidoPacoteService {
             pedido.getHorarios().add(slot);
         }
         pedido = pedidoRepository.saveAndFlush(pedido);
+
+        notificacaoService.criar(
+                aluno.getId(),
+                "ALUNO",
+                "agendada",
+                "Pedido de pacote criado",
+                "Seu pedido do pacote " + pacote.getNome() + " foi criado. Toque para enviar o comprovante Pix.",
+                "PEDIDO",
+                pedido.getId()
+        );
+
+        notificacaoService.criar(
+                instrutor.getId(),
+                "INSTRUTOR",
+                "agendada",
+                "Novo pedido de pacote",
+                "O aluno " + aluno.getNome() + " solicitou o pacote " + pacote.getNome() + ". Toque para acompanhar.",
+                "PEDIDO",
+                pedido.getId()
+        );
+
         return PedidoPacoteDTO.de(pedido);
     }
 
@@ -179,7 +294,19 @@ public class PedidoPacoteService {
         exigirStatus(p, StatusPedido.PENDENTE_PAGAMENTO);
         p.setStatus(StatusPedido.EM_ANALISE);
         p.setComprovanteInformadoEm(LocalDateTime.now());
-        return PedidoPacoteDTO.de(pedidoRepository.save(p));
+        PedidoPacote salvo = pedidoRepository.save(p);
+
+        notificacaoService.criar(
+                p.getInstrutor().getId(),
+                "INSTRUTOR",
+                "pagamento",
+                "Comprovante Pix recebido",
+                "O aluno " + p.getAluno().getNome() + " enviou o comprovante do pacote " + p.getNomePacote() + ". Toque para aprovar ou rejeitar.",
+                "PEDIDO",
+                salvo.getId()
+        );
+
+        return PedidoPacoteDTO.de(salvo);
     }
 
     @Transactional
@@ -207,6 +334,17 @@ public class PedidoPacoteService {
         p.setAnalisadoEm(LocalDateTime.now());
         PedidoPacote salvo = pedidoRepository.save(p);
         aulaService.gerarAulasDePacoteAprovado(salvo);
+
+        notificacaoService.criar(
+                p.getAluno().getId(),
+                "ALUNO",
+                "pagamento",
+                "Pagamento confirmado!",
+                "Seu pacote " + p.getNomePacote() + " foi aprovado por " + p.getInstrutor().getNome() + " e suas aulas já estão agendadas.",
+                "PEDIDO",
+                salvo.getId()
+        );
+
         return PedidoPacoteDTO.de(salvo);
     }
 
@@ -222,7 +360,19 @@ public class PedidoPacoteService {
         p.setMotivoRejeicao(motivo.trim());
         p.setAnalisadoEm(LocalDateTime.now());
         liberarHorarios(p);
-        return PedidoPacoteDTO.de(pedidoRepository.save(p));
+        PedidoPacote salvo = pedidoRepository.save(p);
+
+        notificacaoService.criar(
+                p.getAluno().getId(),
+                "ALUNO",
+                "cancelada",
+                "Pedido de pacote rejeitado",
+                "Seu pedido do pacote " + p.getNomePacote() + " foi rejeitado. Motivo: " + motivo.trim(),
+                "PEDIDO",
+                salvo.getId()
+        );
+
+        return PedidoPacoteDTO.de(salvo);
     }
 
     private PedidoPacote obter(Long id) {

@@ -27,8 +27,11 @@ public class AulaController {
     }
 
     @GetMapping("/aulas/{id}")
-    public ResponseEntity<AulaHistoricoDTO> buscarPorId(@PathVariable Long id) {
-        return ResponseEntity.ok(aulaService.buscarPorId(id));
+    public ResponseEntity<AulaHistoricoDTO> buscarPorId(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "ALUNO") String perfil) {
+        boolean visaoAluno = !"INSTRUTOR".equalsIgnoreCase(perfil);
+        return ResponseEntity.ok(aulaService.buscarPorId(id, visaoAluno));
     }
 
     @GetMapping("/aulas/aluno/{alunoId}")

@@ -19,6 +19,7 @@ import guidaz_api.repository.aula.AulaRepository;
 import guidaz_api.repository.aula.AvaliacaoRepository;
 import guidaz_api.repository.usuario.AlunoRepository;
 import guidaz_api.repository.usuario.InstrutorRepository;
+import guidaz_api.service.notificacao.NotificacaoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,11 +27,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class AulaService {
+
+    private static final DateTimeFormatter DATA_FMT = DateTimeFormatter.ofPattern("dd/MM");
+    private static final DateTimeFormatter HORA_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     private final AulaRepository aulaRepository;
     private final AvaliacaoRepository avaliacaoRepository;
@@ -38,6 +43,7 @@ public class AulaService {
     private final InstrutorRepository instrutorRepository;
     private final DisponibilidadeInstrutorRepository disponibilidadeRepository;
     private final BloqueioAgendaRepository bloqueioRepository;
+    private final NotificacaoService notificacaoService;
 
     @Transactional
     public AulaHistoricoDTO agendar(AgendarAulaRequest request) {
@@ -104,7 +110,29 @@ public class AulaService {
                 .status(StatusAula.AGENDADA)
                 .build();
 
-        return toDto(aulaRepository.save(aula), true);
+        Aula salva = aulaRepository.save(aula);
+
+        String quando = request.getDataAula().format(DATA_FMT) + " às " + request.getHoraInicio().format(HORA_FMT);
+        notificacaoService.criar(
+                aluno.getId(),
+                "ALUNO",
+                "agendada",
+                "Nova aula agendada",
+                "Sua aula com " + instrutor.getNome() + " foi marcada para " + quando + ".",
+                "AULA",
+                salva.getId()
+        );
+        notificacaoService.criar(
+                instrutor.getId(),
+                "INSTRUTOR",
+                "agendada",
+                "Nova aula na agenda",
+                "O aluno " + aluno.getNome() + " agendou uma aula para " + quando + ".",
+                "AULA",
+                salva.getId()
+        );
+
+        return toDto(salva, true);
     }
 
     @Transactional
@@ -179,10 +207,10 @@ public class AulaService {
     }
 
     @Transactional(readOnly = true)
-    public AulaHistoricoDTO buscarPorId(Long id) {
+    public AulaHistoricoDTO buscarPorId(Long id, boolean visaoAluno) {
         Aula aula = aulaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Aula não encontrada."));
-        return toDto(aula, true);
+        return toDto(aula, visaoAluno);
     }
 
     @Transactional
@@ -190,7 +218,20 @@ public class AulaService {
         Aula aula = aulaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Aula não encontrada."));
         aula.setStatus(StatusAula.CONCLUIDA);
-        return toDto(aulaRepository.save(aula), false);
+        Aula salva = aulaRepository.save(aula);
+
+        String quando = aula.getDataAula().format(DATA_FMT) + " às " + aula.getHoraInicio().format(HORA_FMT);
+        notificacaoService.criar(
+                aula.getAluno().getId(),
+                "ALUNO",
+                "pagamento",
+                "Aula concluída!",
+                "Sua aula de " + quando + " com " + aula.getInstrutor().getNome() + " foi concluída. Toque para avaliar!",
+                "AULA",
+                salva.getId()
+        );
+
+        return toDto(salva, false);
     }
 
     @Transactional
@@ -201,7 +242,29 @@ public class AulaService {
             throw new RegraNegocioException("Não é possível cancelar uma aula já concluída.");
         }
         aula.setStatus(StatusAula.CANCELADA);
-        return toDto(aulaRepository.save(aula), true);
+        Aula salva = aulaRepository.save(aula);
+
+        String quando = aula.getDataAula().format(DATA_FMT) + " às " + aula.getHoraInicio().format(HORA_FMT);
+        notificacaoService.criar(
+                aula.getAluno().getId(),
+                "ALUNO",
+                "cancelada",
+                "Aula cancelada",
+                "A aula marcada para " + quando + " com " + aula.getInstrutor().getNome() + " foi cancelada.",
+                "AULA",
+                salva.getId()
+        );
+        notificacaoService.criar(
+                aula.getInstrutor().getId(),
+                "INSTRUTOR",
+                "cancelada",
+                "Aula cancelada",
+                "A aula marcada para " + quando + " com " + aula.getAluno().getNome() + " foi cancelada.",
+                "AULA",
+                salva.getId()
+        );
+
+        return toDto(salva, true);
     }
 
     private AulaHistoricoDTO toDto(Aula aula, boolean visaoAluno) {
