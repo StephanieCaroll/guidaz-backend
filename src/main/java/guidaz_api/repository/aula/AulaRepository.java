@@ -18,6 +18,14 @@ public interface AulaRepository extends JpaRepository<Aula, Long> {
 
     List<Aula> findByInstrutorIdOrderByDataAulaAscHoraInicioAsc(Long instrutorId);
 
+    @Query("""
+        SELECT a FROM Aula a
+        JOIN FETCH a.aluno
+        WHERE a.instrutor.id = :instrutorId
+        ORDER BY a.dataAula ASC, a.horaInicio ASC
+    """)
+    List<Aula> buscarPorInstrutorComAluno(@Param("instrutorId") Long instrutorId);
+
     List<Aula> findByAlunoIdAndStatusOrderByDataAulaAscHoraInicioAsc(Long alunoId, StatusAula status);
 
     List<Aula> findByInstrutorIdAndStatusOrderByDataAulaAscHoraInicioAsc(Long instrutorId, StatusAula status);
