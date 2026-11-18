@@ -1,85 +1,91 @@
 package guidaz_api.controller.aula;
 
-import guidaz_api.dto.agenda.aula.*;
-import guidaz_api.model.aula.Avaliacao;
-import guidaz_api.service.agenda.aula.*;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import guidaz_api.dto.agenda.aula.AgendarAulaRequest;
+import guidaz_api.dto.agenda.aula.AulaHistoricoDTO;
+import guidaz_api.dto.agenda.aula.AvaliacaoRequest;
+import guidaz_api.service.agenda.aula.AulaService;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/aulas")
 @CrossOrigin(origins = "*")
-@RequiredArgsConstructor
 public class AulaController {
 
-    private final AulaService aulaService;
-    private final HorasService horasService;
-    private final ResumoInstrutorService resumoInstrutorService;
-    private final AvaliacaoService avaliacaoService;
+    @Autowired
+    private AulaService aulaService;
 
-    @PostMapping({"/aulas", "/agendamentos/instrutor"})
-    public ResponseEntity<AulaHistoricoDTO> agendar(@RequestBody AgendarAulaRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(aulaService.agendar(request));
+    @PostMapping
+    public ResponseEntity<AulaHistoricoDTO> agendar(@Valid @RequestBody AgendarAulaRequest request) {
+        AulaHistoricoDTO novaAula = aulaService.agendar(request);
+        return ResponseEntity.ok(novaAula);
     }
 
-    @GetMapping("/aulas/{id}")
+    @GetMapping("/{id}")
     public ResponseEntity<AulaHistoricoDTO> buscarPorId(
             @PathVariable Long id,
-            @RequestParam(required = false, defaultValue = "ALUNO") String perfil) {
-        boolean visaoAluno = !"INSTRUTOR".equalsIgnoreCase(perfil);
-        return ResponseEntity.ok(aulaService.buscarPorId(id, visaoAluno));
+            @RequestParam(defaultValue = "ALUNO") String perfil) {
+        AulaHistoricoDTO aula = aulaService.buscarPorId(id, perfil);
+        return ResponseEntity.ok(aula);
     }
 
-    @GetMapping("/aulas/aluno/{alunoId}")
-    public ResponseEntity<List<AulaHistoricoDTO>> listarPorAluno(@PathVariable Long alunoId) {
-        return ResponseEntity.ok(aulaService.listarPorAluno(alunoId));
+    @PutMapping("/{id}")
+    public ResponseEntity<AulaHistoricoDTO> editarAula(
+            @PathVariable Long id,
+            @RequestBody AgendarAulaRequest request) {
+        AulaHistoricoDTO aulaAtualizada = aulaService.editarAula(id, request);
+        return ResponseEntity.ok(aulaAtualizada);
     }
 
-    @GetMapping("/aulas/aluno/{alunoId}/proximas")
-    public ResponseEntity<List<AulaHistoricoDTO>> listarProximasAluno(
+    @GetMapping("/aluno/{alunoId}")
+    public ResponseEntity<List<AulaHistoricoDTO>> historicoAluno(@PathVariable Long alunoId) {
+        List<AulaHistoricoDTO> historico = aulaService.historicoAluno(alunoId);
+        return ResponseEntity.ok(historico);
+    }
+
+    @GetMapping("/aluno/{alunoId}/proximas")
+    public ResponseEntity<List<AulaHistoricoDTO>> proximasAluno(
             @PathVariable Long alunoId,
             @RequestParam(defaultValue = "3") int limite) {
-        return ResponseEntity.ok(aulaService.listarProximasAluno(alunoId, limite));
+        List<AulaHistoricoDTO> proximas = aulaService.proximasAluno(alunoId, limite);
+        return ResponseEntity.ok(proximas);
     }
 
-    @GetMapping("/aulas/instrutor/{instrutorId}")
-    public ResponseEntity<List<AulaHistoricoDTO>> listarPorInstrutor(@PathVariable Long instrutorId) {
-        return ResponseEntity.ok(aulaService.listarPorInstrutor(instrutorId));
+    @GetMapping("/instrutor/{instrutorId}")
+    public ResponseEntity<List<AulaHistoricoDTO>> historicoInstrutor(@PathVariable Long instrutorId) {
+        List<AulaHistoricoDTO> historico = aulaService.historicoInstrutor(instrutorId);
+        return ResponseEntity.ok(historico);
     }
 
-    @GetMapping("/aulas/instrutor/{instrutorId}/proximas")
-    public ResponseEntity<List<AulaHistoricoDTO>> listarProximasInstrutor(
+    @GetMapping("/instrutor/{instrutorId}/proximas")
+    public ResponseEntity<List<AulaHistoricoDTO>> proximasInstrutor(
             @PathVariable Long instrutorId,
             @RequestParam(defaultValue = "3") int limite) {
-        return ResponseEntity.ok(aulaService.listarProximasInstrutor(instrutorId, limite));
+        List<AulaHistoricoDTO> proximas = aulaService.proximasInstrutor(instrutorId, limite);
+        return ResponseEntity.ok(proximas);
     }
 
-    @PatchMapping("/aulas/{id}/concluir")
-    public ResponseEntity<AulaHistoricoDTO> concluir(@PathVariable Long id) {
-        return ResponseEntity.ok(aulaService.concluir(id));
+    @PatchMapping("/{id}/concluir")
+    public ResponseEntity<AulaHistoricoDTO> concluirAula(@PathVariable Long id) {
+        AulaHistoricoDTO aula = aulaService.concluirAula(id);
+        return ResponseEntity.ok(aula);
     }
 
-    @PatchMapping("/aulas/{id}/cancelar")
-    public ResponseEntity<AulaHistoricoDTO> cancelar(@PathVariable Long id) {
-        return ResponseEntity.ok(aulaService.cancelar(id));
+    @PatchMapping("/{id}/cancelar")
+    public ResponseEntity<AulaHistoricoDTO> cancelarAula(@PathVariable Long id) {
+        AulaHistoricoDTO aula = aulaService.cancelarAula(id);
+        return ResponseEntity.ok(aula);
     }
 
-    @GetMapping({"/horas/aluno/{alunoId}", "/aulas/aluno/{alunoId}/resumo"})
-    public ResponseEntity<ResumoHorasDTO> resumoAluno(@PathVariable Long alunoId) {
-        return ResponseEntity.ok(horasService.calcularResumoAluno(alunoId));
-    }
-
-    @GetMapping({"/horas/instrutor/{instrutorId}", "/aulas/instrutor/{instrutorId}/resumo"})
-    public ResponseEntity<ResumoInstrutorDTO> resumoInstrutor(@PathVariable Long instrutorId) {
-        return ResponseEntity.ok(resumoInstrutorService.gerarResumo(instrutorId));
-    }
-
-    @PostMapping({"/aulas/{id}/avaliacoes", "/aulas/{id}/avaliar"})
-    public ResponseEntity<Avaliacao> avaliar(@PathVariable Long id, @RequestBody AvaliacaoRequest request) {
-        return ResponseEntity.ok(avaliacaoService.avaliar(id, request));
+    @PostMapping("/{id}/avaliacoes")
+    public ResponseEntity<Void> avaliar(
+            @PathVariable Long id,
+            @RequestBody AvaliacaoRequest request) {
+        aulaService.avaliar(id, request);
+        return ResponseEntity.ok().build();
     }
 }
