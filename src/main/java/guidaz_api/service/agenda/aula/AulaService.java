@@ -3,6 +3,7 @@ package guidaz_api.service.agenda.aula;
 import guidaz_api.dto.agenda.aula.AgendarAulaRequest;
 import guidaz_api.dto.agenda.aula.AulaHistoricoDTO;
 import guidaz_api.dto.agenda.aula.AvaliacaoRequest;
+import guidaz_api.dto.agenda.aula.ResumoInstrutorDTO;
 import guidaz_api.exception.RecursoNaoEncontradoException;
 import guidaz_api.exception.RegraNegocioException;
 import guidaz_api.model.aula.Aula;
@@ -125,6 +126,39 @@ public class AulaService {
                 .limit(limite)
                 .map(a -> AulaHistoricoDTO.fromEntity(a, false, null))
                 .collect(Collectors.toList());
+    }
+
+    public ResumoInstrutorDTO obterResumoInstrutor(Long instrutorId) {
+        List<Aula> aulas = aulaRepository.buscarPorInstrutorComAluno(instrutorId);
+
+        long totalAulas = aulas.size();
+        long realizadas = aulas.stream().filter(a -> a.getStatus() == StatusAula.CONCLUIDA).count();
+        long canceladas = aulas.stream().filter(a -> a.getStatus() == StatusAula.CANCELADA).count();
+        long agendadas = aulas.stream().filter(a -> a.getStatus() == StatusAula.AGENDADA).count();
+        long faltas = 0;
+
+        long minutosRealizados = aulas.stream()
+                .filter(a -> a.getStatus() == StatusAula.CONCLUIDA && a.getHoraInicio() != null && a.getHoraFim() != null)
+                .mapToLong(a -> java.time.Duration.between(a.getHoraInicio(), a.getHoraFim()).toMinutes())
+                .sum();
+
+        long minutosPendentes = aulas.stream()
+                .filter(a -> a.getStatus() == StatusAula.AGENDADA && a.getHoraInicio() != null && a.getHoraFim() != null)
+                .mapToLong(a -> java.time.Duration.between(a.getHoraInicio(), a.getHoraFim()).toMinutes())
+                .sum();
+
+        return ResumoInstrutorDTO.builder()
+                .totalAulas(totalAulas)
+                .realizadas(realizadas)
+                .canceladas(canceladas)
+                .faltas(faltas)
+                .agendadas(agendadas)
+                .horasRealizadas(minutosRealizados / 60.0)
+                .horasPendentes(minutosPendentes / 60.0)
+                .mediaAvaliacoes(null)
+                .totalAlunos(aulas.stream().map(a -> a.getAluno().getId()).distinct().count())
+                .pedidosPendentes(0)
+                .build();
     }
 
     public AulaHistoricoDTO concluirAula(Long id) {

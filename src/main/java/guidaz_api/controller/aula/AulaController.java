@@ -3,6 +3,7 @@ package guidaz_api.controller.aula;
 import guidaz_api.dto.agenda.aula.AgendarAulaRequest;
 import guidaz_api.dto.agenda.aula.AulaHistoricoDTO;
 import guidaz_api.dto.agenda.aula.AvaliacaoRequest;
+import guidaz_api.dto.agenda.aula.ResumoInstrutorDTO;
 import guidaz_api.service.agenda.aula.AulaService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +68,12 @@ public class AulaController {
             @RequestParam(defaultValue = "3") int limite) {
         List<AulaHistoricoDTO> proximas = aulaService.proximasInstrutor(instrutorId, limite);
         return ResponseEntity.ok(proximas);
+    }
+
+    @GetMapping("/instrutor/{instrutorId}/resumo")
+    public ResponseEntity<ResumoInstrutorDTO> obterResumoInstrutor(@PathVariable Long instrutorId) {
+        ResumoInstrutorDTO resumo = aulaService.obterResumoInstrutor(instrutorId);
+        return ResponseEntity.ok(resumo);
     }
 
     @PatchMapping("/{id}/concluir")
