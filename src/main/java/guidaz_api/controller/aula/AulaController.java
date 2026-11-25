@@ -37,8 +37,9 @@ public class AulaController {
     @PutMapping("/{id}")
     public ResponseEntity<AulaHistoricoDTO> editarAula(
             @PathVariable Long id,
-            @RequestBody AgendarAulaRequest request) {
-        AulaHistoricoDTO aulaAtualizada = aulaService.editarAula(id, request);
+            @RequestBody AgendarAulaRequest request,
+            @RequestParam(defaultValue = "INSTRUTOR") String perfil) {
+        AulaHistoricoDTO aulaAtualizada = aulaService.editarAula(id, request, perfil);
         return ResponseEntity.ok(aulaAtualizada);
     }
 
@@ -83,8 +84,10 @@ public class AulaController {
     }
 
     @PatchMapping("/{id}/cancelar")
-    public ResponseEntity<AulaHistoricoDTO> cancelarAula(@PathVariable Long id) {
-        AulaHistoricoDTO aula = aulaService.cancelarAula(id);
+    public ResponseEntity<AulaHistoricoDTO> cancelarAula(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "INSTRUTOR") String perfil) {
+        AulaHistoricoDTO aula = aulaService.cancelarAula(id, perfil);
         return ResponseEntity.ok(aula);
     }
 

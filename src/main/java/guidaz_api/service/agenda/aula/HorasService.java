@@ -21,13 +21,16 @@ public class HorasService {
     public ResumoHorasDTO calcularResumoAluno(Long alunoId) {
         List<Aula> aulas = aulaRepository.findByAlunoIdOrderByDataAulaAscHoraInicioAsc(alunoId);
 
+        // Aula concluída ou falta do aluno (cancelamento tardio) consomem o crédito.
         double realizadas = aulas.stream()
-                .filter(a -> a.getStatus() == StatusAula.CONCLUIDA)
+                .filter(a -> a.getStatus() == StatusAula.CONCLUIDA || a.getStatus() == StatusAula.FALTA_ALUNO)
+                .filter(a -> a.getHoraInicio() != null && a.getHoraFim() != null)
                 .mapToDouble(a -> Duration.between(a.getHoraInicio(), a.getHoraFim()).toMinutes() / 60.0)
                 .sum();
 
         double pendentes = aulas.stream()
                 .filter(a -> a.getStatus() == StatusAula.AGENDADA)
+                .filter(a -> a.getHoraInicio() != null && a.getHoraFim() != null)
                 .mapToDouble(a -> Duration.between(a.getHoraInicio(), a.getHoraFim()).toMinutes() / 60.0)
                 .sum();
 

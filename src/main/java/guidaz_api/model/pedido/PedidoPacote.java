@@ -55,6 +55,13 @@ public class PedidoPacote {
     @Column(name = "comprovante_informado_em")
     private LocalDateTime comprovanteInformadoEm;
 
+    @Lob
+    @Column(name = "comprovante_url", columnDefinition = "LONGTEXT")
+    private String comprovanteUrl;
+
+    @Column(name = "comprovante_nome", length = 255)
+    private String comprovanteNome;
+
     @Column(name = "analisado_em")
     private LocalDateTime analisadoEm;
 

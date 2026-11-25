@@ -294,6 +294,14 @@ public class PedidoPacoteService {
         exigirStatus(p, StatusPedido.PENDENTE_PAGAMENTO);
         p.setStatus(StatusPedido.EM_ANALISE);
         p.setComprovanteInformadoEm(LocalDateTime.now());
+        if (request != null) {
+            if (request.comprovanteUrl() != null && !request.comprovanteUrl().isBlank()) {
+                p.setComprovanteUrl(request.comprovanteUrl().trim());
+            }
+            if (request.comprovanteNome() != null && !request.comprovanteNome().isBlank()) {
+                p.setComprovanteNome(request.comprovanteNome().trim());
+            }
+        }
         PedidoPacote salvo = pedidoRepository.save(p);
 
         notificacaoService.criar(
