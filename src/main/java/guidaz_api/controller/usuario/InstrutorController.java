@@ -37,13 +37,9 @@ public class InstrutorController {
 
     @PostMapping("/cadastrar")
     public ResponseEntity<?> cadastrar(@RequestBody Instrutor instrutor) {
-        try {
-            instrutor.setPerfil("instrutor");
-            instrutorRepository.save(instrutor);
-            return ResponseEntity.ok("Conta de instrutor cadastrada com sucesso.");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erro ao cadastrar instrutor: " + e.getMessage());
-        }
+        instrutor.setPerfil("instrutor");
+        instrutorRepository.save(instrutor);
+        return ResponseEntity.ok("Conta de instrutor cadastrada com sucesso.");
     }
 
     @GetMapping
@@ -88,7 +84,7 @@ public class InstrutorController {
                 }
             }
 
-            List<Map<String, Object>> resultado = new ArrayList<>(alunosMap.values());
+            var resultado = new ArrayList<>(alunosMap.values());
             return ResponseEntity.ok(resultado);
 
         } catch (Throwable e) {
@@ -133,9 +129,13 @@ public class InstrutorController {
             instrutor.setNome(instrutorAtualizado.getNome());
             instrutor.setEmail(instrutorAtualizado.getEmail());
             instrutor.setTelefone(instrutorAtualizado.getTelefone());
+            instrutor.setNascimento(instrutorAtualizado.getNascimento());
+            instrutor.setGenero(instrutorAtualizado.getGenero());
+            instrutor.setCpf(instrutorAtualizado.getCpf());
             instrutor.setCep(instrutorAtualizado.getCep());
             instrutor.setLogradouro(instrutorAtualizado.getLogradouro());
             instrutor.setNumero(instrutorAtualizado.getNumero());
+            instrutor.setComplemento(instrutorAtualizado.getComplemento());
             instrutor.setBairro(instrutorAtualizado.getBairro());
             instrutor.setCidade(instrutorAtualizado.getCidade());
             instrutor.setCategoriasLecionadas(instrutorAtualizado.getCategoriasLecionadas());
