@@ -47,4 +47,8 @@ public class PedidoPacoteHorario {
     /** 1 = ocupado; NULL = liberado. MySQL permite múltiplos NULL no índice único. */
     @Column(name = "reserva_ativa")
     private Integer reservaAtiva = 1;
+
+    public void setData(LocalDate data) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

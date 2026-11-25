@@ -1,6 +1,7 @@
 package guidaz_api.model.usuario;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -20,7 +21,7 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @SuperBuilder
 public abstract class Usuario {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -31,6 +32,7 @@ public abstract class Usuario {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(nullable = false)
     private String senha;
 
@@ -44,7 +46,7 @@ public abstract class Usuario {
     private String cpf;
 
     @Column(nullable = false)
-    private String perfil; 
+    private String perfil;
 
     @Column(name = "foto_url")
     private String fotoUrl;

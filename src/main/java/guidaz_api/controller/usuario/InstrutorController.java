@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,26 +36,53 @@ public class InstrutorController {
     @Autowired
     private PedidoPacoteRepository pedidoPacoteRepository;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @PostMapping("/cadastrar")
     public ResponseEntity<?> cadastrar(@RequestBody Instrutor instrutor) {
         instrutor.setPerfil("instrutor");
+        if (instrutor.getSenha() != null && !instrutor.getSenha().isBlank()) {
+            instrutor.setSenha(codificarSenhaSeNecessario(instrutor.getSenha()));
+        }
         instrutorRepository.save(instrutor);
         return ResponseEntity.ok("Conta de instrutor cadastrada com sucesso.");
     }
 
     @GetMapping
-    public ResponseEntity<List<Instrutor>> listarTodos() {
+    public ResponseEntity<?> listarTodos() {
         List<Instrutor> instrutores = instrutorRepository.findAll();
-        return ResponseEntity.ok(instrutores);
+        List respostaPublica = new ArrayList<>();
+        for (Instrutor item : instrutores) {
+            respostaPublica.add(criarMapaInstrutorPublico(item));
+        }
+        return ResponseEntity.ok(respostaPublica);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> buscarPorId(@PathVariable Long id) {
         Optional<Instrutor> instrutor = instrutorRepository.findById(id);
         if (instrutor.isPresent()) {
-            return ResponseEntity.ok(instrutor.get());
+            return ResponseEntity.ok(criarMapaInstrutorPublico(instrutor.get()));
         }
         return ResponseEntity.notFound().build();
+    }
+
+    private Map<String, Object> criarMapaInstrutorPublico(Instrutor instrutor) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id", instrutor.getId());
+        item.put("nome", instrutor.getNome());
+        item.put("perfil", instrutor.getPerfil() != null ? instrutor.getPerfil() : "instrutor");
+        item.put("fotoUrl", instrutor.getFotoUrl());
+        item.put("fotoType", instrutor.getFotoType());
+        item.put("bairro", instrutor.getBairro());
+        item.put("cidade", instrutor.getCidade());
+        item.put("categoriasLecionadas", instrutor.getCategoriasLecionadas());
+        item.put("veiculoModelo", instrutor.getVeiculoModelo());
+        item.put("veiculoAno", instrutor.getVeiculoAno());
+        item.put("veiculoPlaca", instrutor.getVeiculoPlaca());
+        item.put("biografia", instrutor.getBiografia());
+        return item;
     }
 
     @GetMapping("/{id}/alunos")
@@ -64,11 +92,10 @@ public class InstrutorController {
                 return ResponseEntity.notFound().build();
             }
 
-            // Queries com JOIN FETCH: já trazem o aluno junto (sem lazy loading)
             List<Aula> aulasInstrutor = aulaRepository.buscarPorInstrutorComAluno(id);
             List<PedidoPacote> pedidosInstrutor = pedidoPacoteRepository.buscarPorInstrutorComAluno(id);
 
-            Map<Long, Map<String, Object>> alunosMap = new LinkedHashMap<>();
+            Map<Long, Map> alunosMap = new LinkedHashMap<>();
 
             for (PedidoPacote pedido : pedidosInstrutor) {
                 Aluno aluno = pedido.getAluno();
@@ -84,11 +111,10 @@ public class InstrutorController {
                 }
             }
 
-            var resultado = new ArrayList<>(alunosMap.values());
+            List resultado = new ArrayList<>(alunosMap.values());
             return ResponseEntity.ok(resultado);
 
         } catch (Throwable e) {
-            // Throwable (e não só Exception) para também capturar Errors e mostrar a causa real
             e.printStackTrace();
 
             Throwable causa = e;
@@ -130,7 +156,6 @@ public class InstrutorController {
             instrutor.setEmail(instrutorAtualizado.getEmail());
             instrutor.setTelefone(instrutorAtualizado.getTelefone());
             instrutor.setNascimento(instrutorAtualizado.getNascimento());
-            instrutor.setGenero(instrutorAtualizado.getGenero());
             instrutor.setCpf(instrutorAtualizado.getCpf());
             instrutor.setCep(instrutorAtualizado.getCep());
             instrutor.setLogradouro(instrutorAtualizado.getLogradouro());
@@ -145,7 +170,7 @@ public class InstrutorController {
             instrutor.setVeiculoPlaca(instrutorAtualizado.getVeiculoPlaca());
 
             if (instrutorAtualizado.getSenha() != null && !instrutorAtualizado.getSenha().isEmpty()) {
-                instrutor.setSenha(instrutorAtualizado.getSenha());
+                instrutor.setSenha(codificarSenhaSeNecessario(instrutorAtualizado.getSenha()));
             }
 
             instrutorRepository.save(instrutor);
@@ -173,14 +198,14 @@ public class InstrutorController {
 
             instrutorRepository.save(instrutor);
 
-            return ResponseEntity.ok(instrutor);
+            return ResponseEntity.ok(criarMapaInstrutorPublico(instrutor));
         } catch (IOException e) {
             return ResponseEntity.badRequest().body("Erro ao salvar foto de perfil: " + e.getMessage());
         }
     }
 
     @GetMapping("/{id}/foto")
-    public ResponseEntity<byte[]> buscarFoto(@PathVariable Long id) {
+    public ResponseEntity<?> buscarFoto(@PathVariable Long id) {
         Optional<Instrutor> instrutorOpt = instrutorRepository.findById(id);
 
         if (instrutorOpt.isEmpty() || instrutorOpt.get().getFotoData() == null) {
@@ -209,5 +234,12 @@ public class InstrutorController {
             return ResponseEntity.ok().body("Conta de instrutor excluída com sucesso.");
         }
         return ResponseEntity.notFound().build();
+    }
+
+    private String codificarSenhaSeNecessario(String senha) {
+        if (senha.startsWith("$2a$") || senha.startsWith("$2b$") || senha.startsWith("$2y$")) {
+            return senha;
+        }
+        return passwordEncoder.encode(senha);
     }
 }
