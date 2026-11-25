@@ -20,7 +20,7 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @SuperBuilder
 public abstract class Usuario {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -44,7 +44,7 @@ public abstract class Usuario {
     private String cpf;
 
     @Column(nullable = false)
-    private String perfil; 
+    private String perfil;
 
     @Column(name = "foto_url")
     private String fotoUrl;
@@ -64,4 +64,10 @@ public abstract class Usuario {
     private String cidade;
     private String numero;
     private String complemento;
+
+    // Preferências individuais do usuário
+    private Boolean temaEscuro = false;
+    private String tamanhoTexto = "Normal";
+    private String idioma = "Português (BR)";
+    private Boolean notificacoes = true;
 }
