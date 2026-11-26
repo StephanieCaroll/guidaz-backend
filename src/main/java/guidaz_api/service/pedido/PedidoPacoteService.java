@@ -330,7 +330,20 @@ public class PedidoPacoteService {
         p.setStatus(StatusPedido.CANCELADO);
         p.setCanceladoEm(LocalDateTime.now());
         liberarHorarios(p);
-        return PedidoPacoteDTO.de(pedidoRepository.save(p));
+        PedidoPacote salvo = pedidoRepository.save(p);
+
+        notificacaoService.criar(
+                p.getInstrutor().getId(),
+                "INSTRUTOR",
+                "cancelada",
+                "Pedido de pacote cancelado",
+                "O aluno " + p.getAluno().getNome() + " cancelou o pedido do pacote " + p.getNomePacote()
+                        + ". Os horários reservados foram liberados na sua agenda.",
+                "PEDIDO",
+                salvo.getId()
+        );
+
+        return PedidoPacoteDTO.de(salvo);
     }
 
     @Transactional
