@@ -13,10 +13,10 @@ public class HistoricoService {
     private final AulaService aulaService;
 
     public List<AulaHistoricoDTO> historicoAluno(Long alunoId) {
-        return aulaService.listarPorAluno(alunoId);
+        return aulaService.historicoAluno(alunoId);
     }
 
     public List<AulaHistoricoDTO> historicoInstrutor(Long instrutorId) {
-        return aulaService.listarPorInstrutor(instrutorId);
+        return aulaService.historicoInstrutor(instrutorId);
     }
 }

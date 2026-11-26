@@ -54,6 +54,12 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Validação (@Valid nos controllers) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
         <!-- Testes Padrão do Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
